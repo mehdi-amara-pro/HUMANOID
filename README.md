@@ -4,7 +4,7 @@ I recorded 12 demonstrations of placing a medicine box into one of four "time of
 
 ## Why this task
 
-Sorting medication into a daily organiser is a repetitive, precise and very human task in care homes and hospitals. A narrow version of it makes a good test for learning from human video: the robot has to reproduce not only *how* I move, but *where* I chose to put the item.
+Sorting medication into a daily organiser is a repetitive, precise and very human task in care homes and hospitals. A narrow version of it makes a good test for learning from human video: the robot has to reproduce not only how I move, but where I chose to put the item.
 
 **Task:** pick up a small medicine box from a fixed start spot and place it in one of four compartments: **Morning, Noon, Afternoon, Night**.
 
@@ -19,8 +19,10 @@ Sorting medication into a daily organiser is a repetitive, precise and very huma
 | Demonstrations | 12 (3 per compartment), laptop webcam |
 | Compartment recovered from video, hand-size depth | 7/12 |
 | Compartment recovered from video, ray–table intersection | **9/12** |
-| LIBERO replay: box in basket | __ / __ rollouts |
-| LIBERO replay: box in intended compartment | __ / __ rollouts |
+| LIBERO replay: box grasped and lifted | 30/36 rollouts |
+| LIBERO replay: box in basket / intended compartment | 0/36 |
+
+Perception works well enough to recover my intent in most demos. The robot replay runs end to end but does not yet succeed, and its failures are systematic, which points to a specific fix (see below).
 
 ## Pipeline
 
@@ -40,9 +42,9 @@ The interface between perception and the robot is an **end-effector target plus 
 
 | Open | Closed |
 |---|---|
-| ![Open](docs/gripopened.png) | ![Closed](docs/gripclosed.png) |
+| ![Open](docs/gripopen.png) | ![Closed](docs/gripclosed.png) |
 
-`pinch ratio = thumb–index distance / palm length`, with hysteresis: closed below 0.72, open again above 0.85
+`pinch ratio = thumb–index distance / palm length`, with hysteresis: closed below 0.72, open again above 0.85.
 
 - A fixed 3 cm threshold only triggered when my whole hand closed, because MediaPipe's fingertip estimates stay a few cm apart in a pinch. Normalising by palm length and tuning on my own hand fixed it.
 - I demonstrated with a two-finger grip, like the robot's parallel gripper, so the signal and the retargeting stay honest.
@@ -67,7 +69,17 @@ How a human demo becomes a robot trajectory:
 
 Task used: LIBERO-Object, "pick up the cream cheese and place it in the basket" (the cream-cheese box stands in for the medicine box).
 
-**Result:** the pipeline runs end to end on all 12 demos, but the robot does not yet succeed. In most rollouts the box is grasped and lifted, but it lands about 15–20 cm from the target compartment, outside the basket. Some rollouts miss the grasp entirely. Because the landing error is consistent, it points to a systematic issue rather than noise: either the box slips during the carry, or a flipped axis between the board frame and the robot's table frame sends the release to the wrong place. <!-- add what the rollout video showed -->
+**Result:** the pipeline runs end to end on real LIBERO (12 demos × 3 scene layouts = 36 rollouts), but the robot does not yet succeed. The box was grasped and lifted in 30/36 rollouts and missed in 6/36, but none landed in the basket.
+
+| One rollout | All 36 rollouts |
+|---|---|
+| ![Replay rollout](docs/gif.gif) | ![LIBERO replay outcomes](docs/summary.png) |
+
+<sub>Right panel of the plot is empty because no rollout landed in the basket; it fills in once the replay offset is fixed.</sub>
+
+The failures are systematic, not random:
+- **Same landing region whatever the intended compartment.** Demos for all four compartments ended up mostly in the basket's far-right region, about 15–20 cm off target. A constant offset like this points to one shared cause rather than the compartment mapping: most likely the box is released or slips before it reaches the basket, or the basket position reported by the simulator is not the centre of its interior.
+- **Missed grasps cluster by demo, not by scene layout.** `noon_01` missed in all three layouts, which points to that demo's grasp timing (the gripper closing before the arm arrives), not to the scene. Demo quality matters as much as the retargeting.
 
 ## Design choices
 
@@ -80,7 +92,7 @@ Task used: LIBERO-Object, "pick up the cream cheese and place it in the basket" 
 
 ## Next steps
 
-- **Fix the replay error:** check the board-to-robot axis mapping on one rollout video, then sweep grasp height and gripper timing.
+- **Fix the replay:** watch one rollout video to tell an early release from a wrong target position, correct that single offset, and add a short pause before the gripper closes so the arm arrives first.
 - **Closed-loop policy** trained on successful replays, compared with open-loop replay on unseen layouts.
 - **Camera calibration** and a stronger 3D hand model (e.g. HaMeR) to remove the residual near-bias.
 - **Egocentric recording** with a head-mounted phone.
@@ -101,3 +113,11 @@ MUJOCO_GL=egl PYOPENGL_PLATFORM=egl python scripts/retarget_replay.py --n_init 3
 ```
 
 Trajectories for all 12 demos are in `trajectories/`, and perception results in `results/`, so every number above can be regenerated without the raw videos.
+
+## The End
+
+Thank you for setting this challenge and for taking the time to go through my attempt!
+
+You're an inspiration.
+
+<sub>Built on a Windows laptop webcam and a Colab T4 GPU, with all demonstration data recorded by me. AI was used responsibly.</sub>
