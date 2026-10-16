@@ -1,0 +1,25 @@
+# Python junk
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.venv/
+
+# Personal editor settings
+.vscode/
+
+# Large files: these go to the Hugging Face Hub, not GitHub
+data/
+videos/
+outputs/
+models/
+*.mp4
+*.mov
+*.MOV
+*.task
+
+# Generated printouts (the script that makes them is committed)
+*.pdf
+
+# Windows junk
+Thumbs.db
+desktop.ini
